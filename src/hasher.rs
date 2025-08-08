@@ -41,6 +41,7 @@ pub enum HashAlgorithm {
     Blake2s,
 }
 
+#[allow(dead_code)]
 impl HashAlgorithm {
     pub fn name(&self) -> &'static str {
         match self {

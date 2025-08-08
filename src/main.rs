@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::env;
 use std::fs::File;
 use std::io::{self, BufReader, Read};
 use anyhow::{Context, Result};
@@ -7,9 +8,8 @@ mod hasher;
 use hasher::{HashAlgorithm, calculate_hash};
 
 #[derive(Parser)]
-#[command(name = "sha-calc")]
+#[command(name = env!("CARGO_PKG_NAME"), version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Calculate SHA hashes for files or stdin")]
-#[command(version = "0.1.0")]
 struct Args {
     /// Hash algorithm to use
     #[arg(short, long, default_value = "sha256")]
@@ -26,15 +26,24 @@ struct Args {
     /// Check hash files (format: hash filename)
     #[arg(short, long)]
     check: bool,
+
+    /// List all supported hash algorithms
+    #[arg(long = "list-algorithms")]
+    list_algorithms: bool,
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    
+
+    if args.list_algorithms {
+        list_algorithms();
+        return Ok(());
+    }
+
     if args.check {
         return check_hashes(&args);
     }
-    
+
     if args.files.is_empty() {
         // Read from stdin
         let hash = calculate_hash_from_reader(&mut io::stdin().lock(), args.algorithm)?;
@@ -46,13 +55,13 @@ fn main() -> Result<()> {
     } else {
         // Process files
         let mut all_files = Vec::new();
-        
+
         for pattern in &args.files {
             if pattern.contains('*') || pattern.contains('?') || pattern.contains('[') {
                 // Handle glob pattern
                 let paths = glob::glob(pattern)
                     .with_context(|| format!("Failed to parse glob pattern: {}", pattern))?;
-                
+
                 for path in paths {
                     let path = path.with_context(|| format!("Failed to process glob: {}", pattern))?;
                     all_files.push(path.display().to_string());
@@ -62,9 +71,9 @@ fn main() -> Result<()> {
                 all_files.push(pattern.clone());
             }
         }
-        
+
         all_files.sort();
-        
+
         for file_path in all_files {
             match process_file(&file_path, args.algorithm, args.quiet) {
                 Ok(()) => {},
@@ -75,8 +84,17 @@ fn main() -> Result<()> {
             }
         }
     }
-    
+
     Ok(())
+}
+fn list_algorithms() {
+    use hasher::HashAlgorithm;
+    use clap::ValueEnum;
+    println!("Supported hash algorithms:");
+    for alg in HashAlgorithm::value_variants() {
+        // Use the clap name for CLI compatibility
+        println!("- {}", alg.to_possible_value().unwrap().get_name());
+    }
 }
 
 fn process_file(file_path: &str, algorithm: HashAlgorithm, quiet: bool) -> Result<()> {
