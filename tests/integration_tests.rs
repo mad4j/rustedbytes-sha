@@ -7,7 +7,7 @@ use tempfile::NamedTempFile;
 
 #[test]
 fn test_stdin_input() {
-    let mut cmd = assert_cmd::Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = assert_cmd::Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.write_stdin("hello world")
         .assert()
         .success()
@@ -19,11 +19,11 @@ fn test_single_file() {
     let mut file = NamedTempFile::new().unwrap();
     writeln!(file, "test content").unwrap();
     
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.arg(file.path())
         .assert()
         .success()
-        .stdout(predicate::str::contains("d85b1213473c2fd7c2045020a6b9c62b"))
+        .stdout(predicate::str::contains("a1fff0ffefb9eace7230c24e50731f0a91c62f9cefdfe77121c2f607125dffae"))
         .stdout(predicate::str::contains(file.path().to_str().unwrap()));
 }
 
@@ -35,7 +35,7 @@ fn test_multiple_files() {
     writeln!(file1, "content1").unwrap();
     writeln!(file2, "content2").unwrap();
     
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.args([file1.path(), file2.path()])
         .assert()
         .success()
@@ -45,7 +45,7 @@ fn test_multiple_files() {
 
 #[test]
 fn test_sha1_algorithm() {
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.args(["-a", "sha1"])
         .write_stdin("hello")
         .assert()
@@ -55,7 +55,7 @@ fn test_sha1_algorithm() {
 
 #[test]
 fn test_sha512_algorithm() {
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.args(["-a", "sha512"])
         .write_stdin("test")
         .assert()
@@ -66,17 +66,17 @@ fn test_sha512_algorithm() {
 
 #[test]
 fn test_quiet_mode() {
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.args(["-q"])
         .write_stdin("hello")
         .assert()
         .success()
-        .stdout("2cf24dba4f21d4288094c3bd68b347d5ca87471a7581b9b06e5e5f7d5b8b1e5c\n");
+        .stdout("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\n");
 }
 
 #[test]
 fn test_empty_input() {
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.write_stdin("")
         .assert()
         .success()
@@ -85,7 +85,7 @@ fn test_empty_input() {
 
 #[test]
 fn test_nonexistent_file() {
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.arg("nonexistent_file.txt")
         .assert()
         .failure()
@@ -103,7 +103,7 @@ fn test_glob_pattern() {
     
     let glob_pattern = temp_dir.path().join("*.txt");
     
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.arg(glob_pattern.to_str().unwrap())
         .assert()
         .success()
@@ -119,7 +119,7 @@ fn test_check_mode() {
     writeln!(content_file, "test content").unwrap();
     
     // First generate hash
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     let output = cmd.arg(content_file.path())
         .output()
         .unwrap();
@@ -128,7 +128,7 @@ fn test_check_mode() {
     writeln!(hash_file, "{}", hash_line.trim()).unwrap();
     
     // Now check it
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.args(["-c", hash_file.path().to_str().unwrap()])
         .assert()
         .success()
@@ -146,7 +146,7 @@ fn test_check_mode_failure() {
     writeln!(hash_file, "0000000000000000000000000000000000000000000000000000000000000000  {}", 
              content_file.path().to_str().unwrap()).unwrap();
     
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.args(["-c", hash_file.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -162,7 +162,7 @@ fn test_all_sha_algorithms() {
     ];
     
     for algorithm in algorithms {
-        let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         cmd.args(["-a", algorithm])
             .write_stdin("test")
             .assert()
@@ -177,7 +177,7 @@ fn test_large_file() {
     let large_content = "x".repeat(100_000);
     write!(file, "{}", large_content).unwrap();
     
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.arg(file.path())
         .assert()
         .success()
@@ -190,7 +190,7 @@ fn test_binary_file() {
     let binary_data: Vec<u8> = (0..=255).collect();
     file.write_all(&binary_data).unwrap();
     
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.arg(file.path())
         .assert()
         .success()
@@ -199,7 +199,7 @@ fn test_binary_file() {
 
 #[test]
 fn test_help_flag() {
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.arg("--help")
         .assert()
         .success()
@@ -208,9 +208,9 @@ fn test_help_flag() {
 
 #[test]
 fn test_version_flag() {
-    let mut cmd = Command::cargo_bin("sha-calc").unwrap();
+    let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
     cmd.arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("0.1.0"));
+        .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
 }

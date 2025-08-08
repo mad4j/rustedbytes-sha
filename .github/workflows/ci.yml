@@ -1,0 +1,208 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - beta
+          - nightly
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: ${{ matrix.rust }}
+        override: true
+        components: rustfmt, clippy
+    
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+    
+    - name: Run clippy
+      run: cargo clippy -- -D warnings
+    
+    - name: Build
+      run: cargo build --verbose
+    
+    - name: Run tests
+      run: cargo test --verbose
+    
+    - name: Run integration tests
+      run: cargo test --test integration_tests --verbose
+
+  compatibility:
+    name: Compatibility Test
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    
+    - name: Build
+      run: cargo build --release
+    
+    - name: Test compatibility with sha256sum
+      run: |
+        echo "test content" > test_file.txt
+        # Generate hash with sha256sum
+        sha256sum test_file.txt > expected.txt
+        # Generate hash with our tool
+        ./target/release/sha-calc test_file.txt > actual.txt
+        # Compare
+        if diff expected.txt actual.txt; then
+          echo "✅ Output is compatible with sha256sum"
+        else
+          echo "❌ Output differs from sha256sum"
+          echo "Expected:"
+          cat expected.txt
+          echo "Actual:"
+          cat actual.txt
+          exit 1
+        fi
+
+  cross-platform:
+    name: Cross Platform
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    
+    - name: Build
+      run: cargo build --release
+    
+    - name: Test
+      run: cargo test
+    
+    - name: Test binary functionality
+      shell: bash
+      run: |
+        echo "hello world" > test.txt
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          ./target/release/sha-calc.exe test.txt
+        else
+          ./target/release/sha-calc test.txt
+        fi
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    
+    - name: Run security audit
+      run: cargo audit
+
+  performance:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    
+    - name: Build release
+      run: cargo build --release
+    
+    - name: Create large test file
+      run: |
+        # Create a 10MB test file
+        dd if=/dev/urandom of=large_file.bin bs=1M count=10
+    
+    - name: Benchmark against sha256sum
+      run: |
+        echo "🔍 Testing performance on large file..."
+        
+        echo "sha256sum:"
+        time sha256sum large_file.bin
+        
+        echo "sha-calc:"
+        time ./target/release/sha-calc large_file.bin
+        
+        echo "✅ Performance test completed"
+
+  release:
+    name: Release Build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, compatibility, cross-platform]
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    
+    - name: Build release
+      run: cargo build --release
+    
+    - name: Create release archive
+      run: |
+        mkdir -p release
+        cp target/release/sha-calc release/
+        cp README.md LICENSE release/
+        tar -czf sha-calc-${{ github.ref_name }}-linux-x86_64.tar.gz -C release .
+    
+    - name: Upload Release Asset
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-linux
+        path: sha-calc-*.tar.gz
